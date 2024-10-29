@@ -1,4 +1,4 @@
-# ff_smart_patrol
+# ff_smarteR
 
 This repository contains the code for analyzing and evaluating SMART patrol data. This repository provides a framework for:
 
