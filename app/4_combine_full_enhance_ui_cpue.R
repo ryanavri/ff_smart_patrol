@@ -3,6 +3,7 @@ options(shiny.maxRequestSize = 200 * 1024^2)
 
 # Load necessary libraries
 library(shiny)
+library(shinythemes)  # For UI themes
 library(sf)
 library(tidyverse)
 library(anytime)
@@ -16,86 +17,126 @@ library(unmarked)
 library(ubms)
 library(patchwork)
 library(lubridate)
+library(reactable)
 
 # Define UI
-ui <- fluidPage(
-  titlePanel("Spatial Data Processing and Occupancy Modeling App"),
-  tabsetPanel(
-    # Tab 1: CSV Data Processing
-    tabPanel(
-      "CSV Data Processing",
-      sidebarLayout(
-        sidebarPanel(
-          fileInput("csv_data", "Upload CSV Data", accept = ".csv"),
-          actionButton("process_csv", "Process CSV Data")
-        ),
-        mainPanel(
-          h3("Findings per Quarter by Kategori Temuan"),
-          tableOutput("findings_per_quarter")
-        )
+ui <- navbarPage(
+  title = "SmarteR Patrol Analysis App",
+  theme = shinytheme("cosmo"),  # Applied a Bootstrap theme for a modern look
+  
+  # Step 1: Covariate Processing
+  tabPanel(
+    "1. Covariate Processing",
+    sidebarLayout(
+      sidebarPanel(
+        h4("Step 1: Upload Raster and Shapefile"),
+        p("Upload your raster layers and shapefile for the patrol sector grid."),
+        fileInput("raster_layers", "Raster Layers (.tif)", multiple = TRUE, accept = ".tif"),
+        fileInput("shapefile", "Shapefile (should contain .shp, .dbf, .shx, .prj)", multiple = TRUE,
+                  accept = c(".shp", ".dbf", ".shx", ".prj")),
+        actionButton("process", "Process Data", icon = icon("play")),
+        width = 3
+      ),
+      mainPanel(
+        h4("Raster Summary"),
+        verbatimTextOutput("raster_summary"),
+        tags$hr(),
+        h4("Correlation Matrix"),
+        plotOutput("correlation_matrix"),
+        tags$hr(),
+        h4("Distribution of Covariate Values"),
+        plotOutput("distribution_plot"),
+        tags$hr(),
+        h4("Map of Covariate Values"),
+        leafletOutput("value_map", height = 600)
       )
-    ),
-    
-    # Tab 2: Raster and Shapefile Processing
-    tabPanel(
-      "Raster and Shapefile Processing",
-      sidebarLayout(
-        sidebarPanel(
-          fileInput("raster_layers", "Upload Raster Layers (.tif)", multiple = TRUE, accept = ".tif"),
-          fileInput("shapefile", "Upload Shapefile for Hex Grid (.shp, .dbf, .shx, .prj)",
-                    multiple = TRUE, accept = c(".shp", ".dbf", ".shx", ".prj")),
-          actionButton("process", "Process Data")
-        ),
-        mainPanel(
-          h3("Raster Summary"),
-          verbatimTextOutput("raster_summary"),
-          h3("Correlation Matrix"),
-          plotOutput("correlation_matrix"),
-          h3("Distribution of Values by Raster Layer"),
-          plotOutput("distribution_plot"),
-          h3("Map of Values by Raster Layer"),
-          leafletOutput("value_map", height = 600)
-        )
+    )
+  ),
+  
+  # Step 2: CSV Data Processing
+  tabPanel(
+    "2. CSV Data Processing",
+    sidebarLayout(
+      sidebarPanel(
+        h4("Step 2: Upload CSV Data"),
+        p("Please upload your CSV data file containing query from SMART"),
+        fileInput("csv_data", "Select CSV File", accept = ".csv"),
+        actionButton("process_csv", "Process Data", icon = icon("play")),
+        width = 3
+      ),
+      mainPanel(
+        h4("Findings per Quarter"),
+        reactableOutput("findings_per_quarter")
       )
-    ),
-    
-    # Tab 3: Occupancy Modeling
-    tabPanel(
-      "Occupancy Modeling",
-      sidebarLayout(
-        sidebarPanel(
-          selectInput(
-            "kategori_temuan",
-            "Select Kategori Temuan for Analysis:",
-            choices = NULL  # Populated dynamically after CSV data upload
-          ),
-          textInput(
-            "model_formula",
-            "Specify the Model Formula:",
-            placeholder = "Example: elev*elev + TRI + biomass + road + cost"
-          ),
-          numericInput(
-            "iterations",
-            "Number of Iterations:",
-            value = 500,
-            min = 500,
-            step = 500
-          ),
-          helpText("Higher iterations can slow down the process. Use 500 for testing, 50000 for the final model."),
-          actionButton("run_model", "Run Occupancy Model")
+    )
+  ),
+  
+  # Step 3: CPUE Plot
+  tabPanel(
+    "3. CPUE Plot",
+    sidebarLayout(
+      sidebarPanel(
+        h4("Step 3: CPUE Plot Parameters"),
+        p("Upload your patrol track shapefile and configure parameters for the CPUE plot."),
+        # Added fileInput for patrol track shapefile
+        fileInput("patrol_shapefile", "(should contain .shp, .dbf, .shx, .prj)", multiple = TRUE,
+                  accept = c(".shp", ".dbf", ".shx", ".prj")),
+        # Moved selectInput here
+        selectInput(
+          "kategori_temuan",
+          "Select Kategori Temuan for Analysis:",
+          choices = NULL  # Populated dynamically after CSV data upload
         ),
-        mainPanel(
-          h3("Model Summary"),
-          verbatimTextOutput("model_summary"),
-          h3("Predicted and Naive Occupancy Plots"),
-          plotOutput("occupancy_plots"),
-          h3("Response effect"),
-          plotOutput("plot_effects")
-        )
+        # Added actionButton to process patrol track data
+        actionButton("process_patrol", "Process Data", icon = icon("play")),
+        # You can add more input controls here for the CPUE plot
+        width = 3
+      ),
+      mainPanel(
+        h4("CPUE Plot"),
+        # Placeholder for CPUE plot output
+        tableOutput("effort_table")
+      )
+    )
+  ),
+  
+  # Step 4: Occupancy Modeling
+  tabPanel(
+    "4. Occupancy Modeling",
+    sidebarLayout(
+      sidebarPanel(
+        h4("Step 4: Model Parameters"),
+        p("Set up your occupancy model parameters."),
+        textInput(
+          "model_formula",
+          "Specify the Model Formula:",
+          placeholder = "e.g., elev*elev + TRI + biomass + road + cost"
+        ),
+        numericInput(
+          "iterations",
+          "Number of Iterations:",
+          value = 500,
+          min = 500,
+          step = 500
+        ),
+        helpText("Higher iterations can slow down the process. Use 500 for testing, 50000 for the final model."),
+        actionButton("run_model", "Run Model", icon = icon("play")),
+        width = 3
+      ),
+      mainPanel(
+        h4("Model Summary"),
+        verbatimTextOutput("model_summary"),
+        tags$hr(),
+        h4("Predicted Map"),
+        plotOutput("occupancy_plots"),
+        tags$hr(),
+        h4("Response Effect"),
+        plotOutput("plot_effects")
       )
     )
   )
 )
+
 
 # Define server logic
 server <- function(input, output, session) {
@@ -121,9 +162,12 @@ server <- function(input, output, session) {
   })
   
   # Calculate the number of findings per quarter by Kategori Temuan and render it as a table
-  output$findings_per_quarter <- renderTable({
+  ## Part 1.1: Generate table of quarterly findings----
+  output$findings_per_quarter <- renderReactable({
     req(data())
-    data() %>%
+    
+    # Process the data
+    findings_data <- data() %>%
       st_set_geometry(NULL) %>%  # Remove the geometry to avoid list columns
       filter(`Observation.Category.0` == "Aktivitas Manusia") %>%
       group_by(YearQuarter, Kategori_temuan) %>%
@@ -131,7 +175,33 @@ server <- function(input, output, session) {
       filter(Kategori_temuan != "") %>% 
       pivot_wider(names_from = Kategori_temuan, values_from = Findings, values_fill = 0) %>%
       arrange(YearQuarter)
+    
+    # Calculate row totals
+    findings_data <- findings_data %>%
+      mutate(Total = rowSums(dplyr::select(., -YearQuarter)))
+    
+    # Calculate column totals
+    total_row <- findings_data %>%
+      dplyr::select(-YearQuarter) %>%
+      summarise(across(everything(), sum)) %>%
+      mutate(YearQuarter = "Total", .before = 1)
+    
+    # Combine the data with the total row
+    findings_data <- bind_rows(findings_data, total_row)
+    
+    # Render the table using reactable
+    reactable(
+      findings_data,
+      pagination = FALSE,
+      highlight = TRUE,
+      bordered = TRUE,
+      columns = list(
+        YearQuarter = colDef(name = "Year-Quarter")
+      ),
+      defaultSorted = "YearQuarter"
+    )
   })
+  
   
   # Update selectInput for available Kategori_temuan after CSV data is processed
   observeEvent(data(), {
@@ -151,7 +221,9 @@ server <- function(input, output, session) {
   })
   
   # Part 2: Raster and Shapefile Processing----
+  
   # Reactive expression to read and process shapefile
+  ## Part 2.1: Read shapefile of patrol sector----
   hex_grid <- reactive({
     req(input$shapefile)
     shpdf <- input$shapefile
@@ -186,7 +258,7 @@ server <- function(input, output, session) {
     print(raster_stack())
   })
   
-  # Reactive expression to extract mean values and standardize covariates
+  ## Part 2.2: Reactive expression to extract mean values and standardize covariates----
   processed_data <- eventReactive(input$process, {
     req(raster_stack(), hex_grid())
     
@@ -217,7 +289,7 @@ server <- function(input, output, session) {
     list(stdz_preds = stdz.preds, raw_preds = raw_preds, hex_grid = hex_3k)
   })
   
-  # Render the correlation matrix plot
+  ## Part 2.3: Render the correlation matrix plot----
   output$correlation_matrix <- renderPlot({
     req(processed_data())
     stdz_preds <- processed_data()$stdz_preds
@@ -227,7 +299,7 @@ server <- function(input, output, session) {
     corrplot(corMat, method = "number", type = "upper", tl.cex = 0.8)
   })
   
-  # Render the distribution plot using ggplot2 as density plots
+  ## Part 2.4: Render the density plots plot----
   output$distribution_plot <- renderPlot({
     req(processed_data())
     raw_preds <- processed_data()$raw_preds
@@ -243,7 +315,7 @@ server <- function(input, output, session) {
       labs(title = "", x = "Mean Value", y = "Density")
   })
   
-  # Render the map of values using leaflet and mapview
+  ## Part 2.5: Render the map of values using mapview----
   output$value_map <- renderLeaflet({
     req(processed_data())
     hex_3k <- processed_data()$hex_grid
@@ -262,8 +334,95 @@ server <- function(input, output, session) {
     # Extract the leaflet map from the mapview object
     m@map
   })
+
+  # Part 3: CPUE----
   
-  # Part 3: Occupancy Modeling----
+  # Reactive expression to read and process patrol track shapefile
+  patrol_tracks <- eventReactive(input$process_patrol, {
+    req(input$patrol_shapefile)
+    shpdf <- input$patrol_shapefile
+    tempdirname <- dirname(shpdf$datapath[1])
+    
+    # Rename uploaded files to their original names
+    for (i in 1:nrow(shpdf)) {
+      file.rename(
+        shpdf$datapath[i],
+        file.path(tempdirname, shpdf$name[i])
+      )
+    }
+    
+    # Find the .shp file among the uploaded files
+    shp_file <- shpdf$name[grep("\\.shp$", shpdf$name)]
+    
+    # Read the shapefile using sf
+    st_read(file.path(tempdirname, shp_file))
+  })
+  
+  # Reactive expression to process the patrol tracks
+  CRP <- reactive({
+    req(patrol_tracks())
+    
+    patrol_tracks() %>% 
+    mutate(Jarak = st_length(.)) %>%
+    dplyr::select(-Patrol_L_1, -Patrol_L_2, -Armed, -Patrol_Leg) %>%
+    mutate(Quarter = quarters(Patrol_Sta), 
+           Year = year(Patrol_Sta),
+           YearQuarter = paste(Year, Quarter, sep = "-"))
+  })
+  
+  # Reactive expression to calculate effort per pseudogrid
+  qr_effort <- reactive({
+    req(CRP(), hex_grid())
+    
+    # Select and rename necessary columns
+    crp_data <- CRP() %>%
+      dplyr::select(geometry, YearQuarter_crp = YearQuarter)
+    
+    hex_data <- hex_grid() %>%
+      dplyr::select(geometry, grid_id_hex = grid_id)
+    
+    # Perform spatial intersection
+    intersected_data <- st_intersection(crp_data, hex_data)
+    
+    # Calculate lengths
+    intersected_data <- intersected_data %>%
+      mutate(intersect_length = st_length(geometry))
+    
+    # Group and summarize
+    effort_data <- intersected_data %>%
+      group_by(grid_id, YearQuarter) %>%
+      summarize(effort_km = sum(as.numeric(intersect_length) / 1000, na.rm = TRUE)) %>%
+      as.data.frame() %>%
+      dplyr::select(-geometry)
+    
+    # Ensure all columns are atomic vectors
+    effort_data$grid_id <- as.character(effort_data$grid_id)
+    effort_data$YearQuarter <- as.character(effort_data$YearQuarter)
+    effort_data$effort_km <- as.numeric(effort_data$effort_km)
+    
+    # Return the data frame
+    effort_data
+  })
+  
+  
+  # Render the effort table
+  output$effort_table <- renderTable({
+    req(qr_effort())
+    
+    qr_ef <- qr_effort()
+    
+    # Check the structure
+    print(str(qr_ef))
+    
+    head(qr_ef)
+  })
+  
+  
+  
+  
+    
+  # Part 4: Occupancy Modeling----
+  
   # Reactive expression for filtering data based on the selected Kategori_temuan
   perburuan_satwa <- reactive({
     req(data(), input$kategori_temuan)
@@ -274,6 +433,7 @@ server <- function(input, output, session) {
       filter(Kategori_temuan == input$kategori_temuan)
   })
   
+  ## Part 4.1 : Create occupancy detection----
   # Reactive expression for performing spatial intersection with hex grid
   intersected_findings <- reactive({
     req(data(), processed_data())
@@ -335,7 +495,7 @@ server <- function(input, output, session) {
       left_join(monthly_replication_wide(), by="grid_id")
   })
   
-  # Run the occupancy model
+  ## Part 4.2: Run the occupancy model----
   model_results <- eventReactive(input$run_model, {
     req(occu_dat(), input$model_formula, input$iterations, processed_data())
     
@@ -395,7 +555,7 @@ server <- function(input, output, session) {
     (model_results()$model)
   })
   
-  # Display predicted and naive occupancy plots
+  ## Part 4.3: Display predicted and naive occupancy plots----
   output$occupancy_plots <- renderPlot({
     req(model_results(), processed_data())
     
@@ -454,7 +614,7 @@ server <- function(input, output, session) {
     print(plot_combined)
   })
   
-  # Display plot_effects
+  ## Part 4.4: Display plot effects----
   output$plot_effects <- renderPlot({
     req(model_results())
     
