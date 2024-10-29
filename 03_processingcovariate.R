@@ -51,18 +51,8 @@ costrast <- movecost(dtm = ele_raster, origin = final_spatial_df, funct = "r",
 
 # Step 4: Load Pseudo Grid and Assign Grid IDs ---------------------------------
 
-# Load hexagonal grid shapefile (3000m grid)
-hex_3k <- st_read("hex3000.shp")
-
-# Assign grid IDs (create a unique grid_id for each polygon)
-n <- nrow(hex_3k)  # Number of rows (hexagons)
-hex_3k$grid_id <- sprintf("hx3k%02d", 1:n)  # Create unique IDs (e.g., "hx3k01", "hx3k02", etc.)
-
-# Keep only geometry and grid_id columns for optimization
-hex_3k <- hex_3k[, c("geometry", "grid_id")]
-
-# Check the structure of the hex_3k object
-glimpse(hex_3k)
+# Load_polygon of patrol sector----
+hex <- st_read("spatial/hex.shp")
 
 # Step 5: Extract Covariate Values for Each Grid --------------------------------
 
@@ -77,7 +67,7 @@ raster_layers <- list(
 
 # Extract mean values of raster layers for each hexagonal grid
 for (layer in names(raster_layers)) {
-  hex_3k[[layer]] <- exact_extract(raster_layers[[layer]], hex_3k, fun = 'mean')
+  hex[[layer]] <- exact_extract(raster_layers[[layer]], hex, fun = 'mean')
 }
 
 # Step 6: Standardize Covariates ------------------------------------------------
@@ -89,8 +79,8 @@ var.stdz <- function(x) {
   (x - m.x) / sd.x
 }
 
-# Extract the covariate data (numeric predictors) from the hex_3k dataframe
-preds <- hex_3k %>%
+# Extract the covariate data (numeric predictors) from the hex dataframe
+preds <- hex %>%
   dplyr::select(c(3:7)) %>%  # Select covariate columns (excluding geometry and grid_id)
   as.data.frame() %>%
   dplyr::select(-geometry)
@@ -116,4 +106,4 @@ round(corMat, 3)
 corrplot(corMat, method="number")
 
 # Save the objects to an RData file ---------------------
-save(raster_layers, preds, hex_3k, stdz.preds, file = "covariate.RData")
+save(raster_layers, preds, hex, stdz.preds, file = "covariate.RData")
