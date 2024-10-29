@@ -1,23 +1,22 @@
-library(tidyverse)
-library(lubridate)
-library(chron)
-library(anytime)
+# loaf libraries
+suppressMessages(require(tidyverse))
+suppressMessages(require(lubridate))
+suppressMessages(require(chron))
+suppressMessages(require(anytime))
+suppressMessages(require(sf))
+suppressMessages(require(nlme))
+suppressMessages(require(ggpubr))
 
-library(sf)
-library(nlme)
-library(ggpubr)
+args = commandArgs(trailingOnly=TRUE)
+myquery1 = args[1]
+myquery2 = args[2]
 
 # Load_data----
-ringkasan_patroli <- st_read("Jalur_Patroli_2019.shp")
-CRP <- ringkasan_patroli %>% 
-  mutate(Jarak = st_length(ringkasan_patroli)) %>%
-  select(-Patrol_L_1, -Patrol_L_2, -Armed, -Patrol_Leg) %>%
-  mutate(Quarter = quarters(Patrol_Sta), 
-         Year = year(Patrol_Sta)) %>%
-  mutate(YearQuarter = paste(Year, Quarter, sep = "-"))
-  
-  
-aktivitas_manusia <- read.csv("Aktivitas_Manusia_2019.csv")
+setwd("D:/11_Coding_test/ffip_smart_patrol")
+
+# READ IN ILLEGAL ACTIVITY AND ASSOCIATED EFFORT DATA
+
+aktivitas_manusia <- read.csv("myquery1")
 CAM <- aktivitas_manusia %>%
   st_as_sf(coords = c("X", "Y"), crs = 32747) %>%
   rename('Patrol_ID' ='Patrol.ID') %>%
@@ -30,23 +29,23 @@ CAM <- aktivitas_manusia %>%
   mutate(YearQuarter = paste(Year, Quarter, sep = "-")) %>%
   filter(Kategori_temuan == "Perburuan Satwa") # poaching-related threats
 
-# Load_polygon----
-core <- st_read("Core_area.shp")
-hex_3k <- st_read("hex3000.shp")
-hex_5k <- st_read("hex5000.shp")
+ringkasan_patroli <- st_read("myquery2")
+CRP <- ringkasan_patroli %>% 
+  mutate(Jarak = st_length(ringkasan_patroli)) %>%
+  select(-Patrol_L_1, -Patrol_L_2, -Armed, -Patrol_Leg) %>%
+  mutate(Quarter = quarters(Patrol_Sta), 
+         Year = year(Patrol_Sta)) %>%
+  mutate(YearQuarter = paste(Year, Quarter, sep = "-"))
 
-# Create a sequence for grid_id----
-n <- nrow(hex_5k)  # Get the number of rows
-hex_5k$grid_id <- sprintf("hx5k%02d", 1:n)  # Create the series 
-hex_5k <- hex_5k[, c("geometry", "grid_id")] # Optimizing attribute 
-glimpse(hex_5k)
+# Load_polygon----
+hex <- st_read("hex.shp")
 
 # Calculate effort per pseudogrid----
 # Ensure both datasets use the same CRS (coordinate reference system)
-st_crs(CRP) <- st_crs(hex_5k)
+st_crs(CRP) <- st_crs(hex)
 
 # Perform the spatial intersection to get the patrol segments within each grid
-intersected_data <- st_intersection(CRP, hex_5k)
+intersected_data <- st_intersection(CRP, hex)
 
 intersected_data <- intersected_data %>%
   mutate(intersect_length = st_length(geometry))
@@ -60,10 +59,10 @@ qr_effort <- intersected_data %>%
 
 # Calculate cpue per pseudogrid----
 # Ensure both datasets have the same CRS
-st_crs(CAM) <- st_crs(hex_5k)
+st_crs(CAM) <- st_crs(hex)
 
 # Step 3: Perform spatial intersection with hex_3k to count findings in each grid
-intersected_findings <- st_intersection(CAM, hex_5k)
+intersected_findings <- st_intersection(CAM, hex)
 
 # Step 4: Count the number of findings within each grid_id
 qr_find <- intersected_findings %>%
@@ -78,7 +77,7 @@ qr_cpue <- qr_effort %>%
   replace_na(list(findings = 0,  cpue = 0)) %>%
   mutate(diff_cpue = ifelse(grepl("Q1", YearQuarter), NA, cpue - lag(cpue)),
          diff_effort = ifelse(grepl("Q1", YearQuarter), NA, effort_km - lag(effort_km))) 
-  
+
 
 # Remove rows with NA values resulting from the lag
 qr_cpue1 <- na.omit(qr_cpue)
@@ -92,9 +91,9 @@ ggplot(qr_cpue1, aes(x = diff_effort, y = diff_cpue)) +
   labs(title = "CPUE vs Patrol Effort",
        x = "Patrol Effort (km) (t-1)",
        y = "CPUE (t-1)") +
-# Add regression equation and R² to the top-right corner
-stat_regline_equation(aes(label = ..eq.label..), formula = y ~ x, 
-                      label.x = Inf, label.y = Inf, hjust = 1.1, vjust = 1.2) +
+  # Add regression equation and R² to the top-right corner
+  stat_regline_equation(aes(label = ..eq.label..), formula = y ~ x, 
+                        label.x = Inf, label.y = Inf, hjust = 1.1, vjust = 1.2) +
   stat_cor(aes(label = ..rr.label..), label.x = Inf, label.y = Inf, 
            hjust = 1.1, vjust = 2.5)  # Adjust hjust and vjust for precise positioning
 

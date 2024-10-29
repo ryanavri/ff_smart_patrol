@@ -1,9 +1,15 @@
+
+
+library(dplyr)
+library(ggplot2)
+library(nlme)
+
 # Set seed for reproducibility
 set.seed(212)
 
 # Number of grids and years
 n_grids <- 50
-n_years <- 3
+n_years <- 8
 
 # Create a data frame representing grid IDs and years
 grid_ids <- rep(1:n_grids, each = n_years)
@@ -48,8 +54,6 @@ sim_data <- sim_data %>%
 sim_data <- na.omit(sim_data)
 
 
-library(nlme)
-
 # Fit a GLS model accounting for ruggedness and proximity to boundary, assuming within-grid correlation
 gls_model <- gls(diff_CPUE ~ diff_patrol_effort + ruggedness + proximity_to_boundary, 
                  correlation = corAR1(form = ~ year | grid_id),  # AR(1) correlation within grids over years
@@ -59,13 +63,17 @@ gls_model <- gls(diff_CPUE ~ diff_patrol_effort + ruggedness + proximity_to_boun
 summary(gls_model)
 
 # Plot the relationship between the difference in CPUE and the difference in patrol effort
-library(ggplot2)
-
-ggplot(sim_data, aes(x = diff_patrol_effort, y = diff_CPUE, )) +
+ggplot(sim_data, aes(x = diff_patrol_effort, y = diff_CPUE)) +
   geom_point() +
-  geom_smooth(method = "lm", se = TRUE) +
+  geom_smooth(method="lm", color="#CD001A", se=F, 
+              size=1.3, linetype="dashed") +
   theme_bw() +
+  geom_smooth(method = "loess", se = TRUE) +
   labs(title = "CPUE vs Patrol Effort",
        x = "Patrol Effort (km) (t-1)",
-       y = "CPUE (t-1)")
-
+       y = "CPUE (t-1)") +
+  # Add regression equation and R² to the top-right corner
+  stat_regline_equation(aes(label = ..eq.label..), formula = y ~ x, 
+                        label.x = Inf, label.y = Inf, hjust = 1.1, vjust = 1.2) +
+  stat_cor(aes(label = ..rr.label..), label.x = Inf, label.y = Inf, 
+           hjust = 1.1, vjust = 2.5)  # Adjust hjust and vjust for precise positioning

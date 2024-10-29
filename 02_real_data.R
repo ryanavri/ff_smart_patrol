@@ -5,14 +5,14 @@ library(anytime)
 
 library(sf)
 
-ringkasan_patroli <- st_read("Jalur_Patroli_2017.shp")
+ringkasan_patroli <- st_read("Jalur_Patroli_2019.shp")
 
 CRP <- ringkasan_patroli %>%  #name of data stands for "Cleaned Ringkasan Patroli"
   mutate(Jarak = st_length(ringkasan_patroli)) %>%
   select(-Patrol_L_1, -Patrol_L_2, -Armed, -Patrol_Leg) %>%
   as.data.frame()
 
-aktivitas_manusia <- read.csv("Aktivitas_Manusia_2017.csv")
+aktivitas_manusia <- read.csv("Aktivitas_Manusia_2019.csv")
 
 CAM <- aktivitas_manusia %>%
   rename('Patrol_ID' ='Patrol.ID') %>%
@@ -90,7 +90,7 @@ ggplot() +
   
   # Theme and labels
   theme_bw() +
-  labs(title = "Patrol Effort and Number of Records Over Time", x = "Year-Quarter") +
+  labs(title = "Patrol Effort and and CPUE Over Time", x = "Year-Quarter") +
   
   # Left y-axis for number of records
   scale_y_continuous(name = "CPUE", 
